@@ -81,6 +81,11 @@ final class Dos
         if (!$ip) {
             return true;
         }
+        $methods = $this->config->getListenMethods();
+        if (!in_array("ANY", $methods) && !in_array($_SERVER['REQUEST_METHOD'], $methods)) {
+            $this->addDebugMessage("method ".$_SERVER["REQUEST_METHOD"]."不是".join("|",$methods)."之一");
+            return false;
+        }
 
         if (in_array($ip, $this->config->getWhiteList())) {
             $this->addDebugMessage("The $ip in whitelist");

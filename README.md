@@ -5,7 +5,11 @@
 限制单页每秒请求数和站点每秒请求数
 
 ## 安装方法
+
+```Bash
 npm install sohophp/security
+```
+
 
 ## 使用方法
 

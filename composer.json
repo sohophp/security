@@ -1,0 +1,22 @@
+{
+  "version": "v1.0.1",
+  "name": "sohophp/security",
+  "description": "A PHP class that avoids violent attacks 一个规避暴力攻击的PHP类",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "jason",
+      "email": "sohophp@gmail.com"
+    }
+  ],
+  "homepage": "https://www.sohophp.app",
+  "autoload": {
+    "psr-4": {
+      "Sohophp\\Security\\": "src\\"
+    }
+  },
+  "require": {
+    "php": "^7.2"
+  }
+}

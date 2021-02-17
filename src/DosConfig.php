@@ -60,16 +60,24 @@ final class DosConfig implements ArrayAccess
      * @var string
      */
     private $data_directory;
+    /**
+     * @var array|string[] 监听的请求方法
+     */
     private $listen_methods = ['ANY'];
+    /**
+     * @var bool 是否记录请求详情
+     */
+    private $spread = false;
+    /**
+     * @var bool 是否使用调试
+     */
+    private $debug = false;
 
     public function __construct(array $options = [])
     {
         $options = array_replace([
             'data_directory' => sys_get_temp_dir()
         ], $options);
-
-        $options['data_directory'] = rtrim($options['data_directory'], '/') . '/DOS_logs';
-
         foreach ($options as $name => $value) {
             $this->{$name} = $value;
         }
@@ -265,6 +273,22 @@ final class DosConfig implements ArrayAccess
     }
 
     /**
+     * @param string $data_directory
+     * @return DosConfig
+     */
+    public function withDataDirectory(string $data_directory): DosConfig
+    {
+        $clone = clone $this;
+        $clone->setDataDirectory($data_directory);
+        return $clone;
+    }
+
+    public function getLogDirectory(): string
+    {
+        return rtrim($this->getDataDirectory(), '/') . '/DoS_log';
+    }
+
+    /**
      * @param array $listen_methods
      */
     public function setListenMethods(array $listen_methods)
@@ -289,6 +313,60 @@ final class DosConfig implements ArrayAccess
     public function getListenMethods(): array
     {
         return $this->listen_methods;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSpread(): bool
+    {
+        return $this->spread;
+    }
+
+    /**
+     * @param bool $spread
+     */
+    public function setSpread(bool $spread): void
+    {
+        $this->spread = $spread;
+    }
+
+    /**
+     * @param bool $spread
+     * @return DosConfig
+     */
+    public function withSpread(bool $spread): DosConfig
+    {
+        $clone = clone $this;
+        $clone->setSpread($spread);
+        return $clone;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDebug(): bool
+    {
+        return $this->debug;
+    }
+
+    /**
+     * @param bool $debug
+     */
+    public function setDebug(bool $debug): void
+    {
+        $this->debug = $debug;
+    }
+
+    /**
+     * @param bool $debug
+     * @return DosConfig
+     */
+    public function withDebug(bool $debug): DosConfig
+    {
+        $clone = clone $this;
+        $clone->setDebug($debug);
+        return $clone;
     }
 
     /**

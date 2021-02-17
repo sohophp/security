@@ -41,7 +41,8 @@ $dos = new Sohophp\Security\Dos($config);
 //$dos->run();
 //测试使用
 try{
-    if($dos->refused()){
+
+    if($dos->refused()){ 
         print_r($dos->getDebugMessages());
         die("已被拉黑");
     }

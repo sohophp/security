@@ -30,10 +30,21 @@ final class Dos
      */
     private $debug_messages = [];
     /**
-     * @var string 当前网址
+     * @var string 请求网址
      */
-    private $uri;
-
+    private $request_uri;
+    /**
+     * @var int 请求时间
+     */
+    private $request_time;
+    /**
+     * @var string 请求方法
+     */
+    private $request_method;
+    /**
+     * @var string 数据路径
+     */
+    private $dir;
 
     /**
      * Dos constructor.
@@ -43,9 +54,11 @@ final class Dos
     {
 
         $this->ip = $_SERVER['REMOTE_ADDR'];
-        $this->uri = $_SERVER['REQUEST_URI'];
+        $this->request_uri = $_SERVER['REQUEST_URI'];
+        $this->request_time = $_SERVER['REQUEST_TIME'];
+        $this->request_method = $_SERVER['REQUEST_METHOD'];
         $this->config = $config ?? new DosConfig();
-        $this->addDebugMessage("[{$this->ip}] {$this->uri}");
+        $this->addDebugMessage("{$this->ip} [{$this->request_method}] {$this->request_uri}");
         $this->autoClean();
     }
 
@@ -55,19 +68,21 @@ final class Dos
      */
     private function getDir(): string
     {
-        $dir = $this->config->getDataDirectory();
-        if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
-            throw new ErrorException("Dos: Failed to create folders");
-        }
+        if (!$this->dir) {
+            $dir = $this->config->getLogDirectory();
+            if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
+                throw new ErrorException("Dos: Failed to create folders");
+            }
 
-        $dir = rtrim($dir, '/') . '/' . date("Ymd") . '/' . date('H');
-        $ip_path = explode('.', $this->ip);
-        $dir .= '/' . implode("/", $ip_path);
-        if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
-            throw new ErrorException("Dos: Failed to create folders");
+            $dir = rtrim($dir, '/') . '/' . date("Ymd") . '/' . date('H');
+            $ip_path = explode('.', $this->ip);
+            $dir .= '/' . implode("/", $ip_path);
+            if (!is_dir($dir) && !@mkdir($dir, 0777, true)) {
+                throw new ErrorException("Dos: Failed to create folders");
+            }
+            $this->dir = $dir;
         }
-
-        return $dir;
+        return $this->dir;
     }
 
     /**
@@ -81,11 +96,6 @@ final class Dos
         if (!$ip) {
             return true;
         }
-        $methods = $this->config->getListenMethods();
-        if (!in_array("ANY", $methods) && !in_array($_SERVER['REQUEST_METHOD'], $methods)) {
-            $this->addDebugMessage("method ".$_SERVER["REQUEST_METHOD"]."不是".join("|",$methods)."之一");
-            return false;
-        }
 
         if (in_array($ip, $this->config->getWhiteList())) {
             $this->addDebugMessage("The $ip in whitelist");
@@ -96,28 +106,66 @@ final class Dos
          * 如果在黑名单中，更新拉黑时间并返回真
          */
         if ($this->inBlackList()) {
-            $this->addToBlackList();
             return true;
         }
 
         $dir = $this->getDir();
-        $filename = $dir . '/' . md5($this->uri);
-        $page_count = 1;
+        $data_info = [
+            "REQUEST_URI" => $this->request_uri,
+            "NOW" => microtime(true),
+            "method" => $_SERVER['REQUEST_METHOD'],
+            "REQUEST_TIME" => $this->request_time,
+            //"USER_AGENT" => $_SERVER['HTTP_USER_AGENT']
+        ];
+
+        $filename = $dir . '/' . md5($this->request_uri);
+        $count = 1;
+
         if (!file_exists($filename)) {
-            $data = ["count" => 1];
-            file_put_contents($filename, json_encode($data));
+            touch($filename, $this->request_time, $this->request_time);
             chmod($filename, 0777);
-        } elseif (filemtime($filename) + $this->config->getPageInterval() < time()) {
             $data = ["count" => 1];
+            if ($this->config->isSpread()) {
+                $data_info['s'] = 1;
+                $data_info['c'] = 1;
+                $data['info'] = [$data_info];
+            }
             file_put_contents($filename, json_encode($data));
+            $this->addDebugMessage("page:第一次请求");
+        } elseif (filemtime($filename) + $this->config->getPageInterval() < $this->request_time) {
+            $data = ["count" => 1];
+            if ($this->config->isSpread()) {
+                $data_info['s'] = 2;
+                $data_info['ss'] = microtime(true);
+                $data_info['c'] = 1;
+                $data['info'] = [$data_info];
+            }
+            file_put_contents($filename, json_encode($data));
+            $this->addDebugMessage("page:上次请求过时");
         } else {
             $data = json_decode(file_get_contents($filename), true);
             if (!$data) {
                 $data = ["count" => 1];
+                if ($this->config->isSpread()) {
+                    $data_info['s'] = 3;
+                    $data_info['ss'] = microtime(true);
+                    $data_info['c'] = 1;
+                    $data['info'] = $data_info;
+                }
+                $this->addDebugMessage("page:JSON文件出错");
             } else {
-                $page_count = $data['count'] + 1;
-                $this->addDebugMessage('page count ' . $page_count);
-                $data["count"] = $page_count;
+                $count = $data['count'] + 1;
+                $data["count"] = $count;
+                if ($this->config->isSpread()) {
+                    if (!isset($data['info'])) {
+                        $data['info'] = [];
+                    }
+                    $data_info['s'] = 4;
+                    $data_info['ss'] = microtime(true);
+                    $data_info['c'] = $count;
+                    $data['info'][] = $data_info;
+                }
+                $this->addDebugMessage('page: count ' . $count);
             }
             file_put_contents($filename, json_encode($data));
         }
@@ -125,50 +173,83 @@ final class Dos
         /**
          * 单面请求超过配置数量，加入黑名称并返回真
          */
-        if ($page_count > $this->config->getPageCount()) {
-            $this->addToBlackList();
+        if ($count > $this->config->getPageCount()) {
+            $this->addToBlackList("page: $this->request_uri  count " . $count . ">" . $this->config->getPageCount());
+            $this->addDebugMessage("page: count " . $count . ">" . $this->config->getPageCount());
+            if ($this->config->isSpread()) {
+                foreach ($data['info'] ?? [] as $info) {
+                    $this->addDebugMessage(print_r($info, true));
+                }
+            }
             return true;
         }
 
-        $site_filename = $dir . "/site";
-        $site_count = 1;
-        if (!file_exists($site_filename)) {
+        $filename = $dir . "/site";
+        $count = 1;
+
+        if (!file_exists($filename)) {
+            touch($filename, $this->request_time, $this->request_time);
+            chmod($filename, 0777);
             $data = ["count" => 1];
-            file_put_contents($site_filename, json_encode($data));
-        } elseif (filemtime($site_filename) + $this->config->getSiteInterval() < time()) {
+            if ($this->config->isSpread()) {
+                $data['info'] = [$data_info];
+            }
+            file_put_contents($filename, json_encode($data));
+            $this->addDebugMessage("site: 第一次请求");
+        } elseif (filemtime($filename) + $this->config->getSiteInterval() < $this->request_time) {
             $data = ["count" => 1];
-            file_put_contents($site_filename, json_encode($data));
+            if ($this->config->isSpread()) {
+                $data['info'] = [$data_info];
+            }
+            file_put_contents($filename, json_encode($data));
+            $this->addDebugMessage("site: 上次请求过时，重新计算第一次请求");
         } else {
-            $data = json_decode(file_get_contents($site_filename), true);
+            $data = json_decode(file_get_contents($filename), true);
             if (!$data) {
                 $data = ["count" => 1];
+                if ($this->config->isSpread()) {
+                    $data['info'] = [$data_info];
+                }
+                $this->addDebugMessage("site: JSON错误，重新计算");
             } else {
-                $site_count = $data['count'] + 1;
-                $this->addDebugMessage('site_count ' . $site_count);
-                $data['count'] = $site_count;
+                $count = $data['count'] + 1;
+                if ($this->config->isSpread()) {
+                    if (!isset($data['info'])) {
+                        $data['info'] = [];
+                    }
+                    $data['info'][] = $data_info;
+                }
+                $this->addDebugMessage('site: count ' . $count);
+                $data['count'] = $count;
             }
-            file_put_contents($site_filename, json_encode($data));
+            file_put_contents($filename, json_encode($data));
         }
 
         /**
          * 站点请求数量超过配置数量，加入黑名单并返回真
          */
-        if ($site_count > $this->config->getSiteCount()) {
-            $this->addToBlackList();
+        if ($count > $this->config->getSiteCount()) {
+            $this->addToBlackList("site: " . $this->request_uri . " count $count > " . $this->config->getSiteCount());
+            $this->addDebugMessage("site: count $count > " . $this->config->getSiteCount());
+            if ($this->config->isSpread()) {
+                foreach ($data['info'] ?? [] as $info) {
+                    $this->addDebugMessage(print_r($info, true));
+                }
+            }
             return true;
         }
 
         return false;
-
     }
-
 
     /**
      * @param string $message
      */
     private function addDebugMessage(string $message)
     {
-        $this->debug_messages[] = $message;
+        if ($this->config->isDebug()) {
+            $this->debug_messages[] = $message;
+        }
     }
 
     /**
@@ -181,17 +262,25 @@ final class Dos
 
     /**
      * 加入黑名单
+     * @param string|null $message
+     * @param array $data
      * @throws ErrorException
      */
-    public function addToBlackList()
+    public function addToBlackList(?string $message = null, array $data = [])
     {
         $dir = $this->getDir();
         $filename = $dir . '/black-list';
-        $blocking_period = time() + $this->config->getBlockingPeriod();
-        $this->addDebugMessage("Locked from " . date('Y-m-d H:i:s') . ' to ' . date("Y-m-d H:i:s", $blocking_period));
-        file_put_contents($filename, json_encode(["blocking_period" => $blocking_period]));
-        chmod($filename, 0777);
 
+
+        $blocking_period = $this->request_time + $this->config->getBlockingPeriod();
+        $this->addDebugMessage("Locked from " . date('Y-m-d H:i:s') . ' to ' . date("Y-m-d H:i:s", $blocking_period));
+        $data ["blocking_period"] = $blocking_period;
+        if ($message != '') {
+            $data['message'] = $message;
+        }
+
+        file_put_contents($filename, json_encode($data));
+        chmod($filename, 0777);
         if (is_callable($this->blocking_callback)) {
             $args = [];
             call_user_func($this->blocking_callback, $args);
@@ -217,10 +306,11 @@ final class Dos
         }
 
         $blocking_period = $data['blocking_period'] ?? 0;
-
-        $inBlockList = $blocking_period > time();
+        $inBlockList = $blocking_period > $this->request_time;
         if ($inBlockList) {
-            $this->addDebugMessage("Locked to " . date("Y-m-d H:i:s", $blocking_period));
+            $this->addDebugMessage("Locked to " . $blocking_period . ":" . date("Y-m-d H:i:s", $blocking_period));
+            $this->addDebugMessage("Locked info : " . ($data['message'] ?? ''));
+            $this->addToBlackList($data['message']);
         }
 
         return $inBlockList;
@@ -247,7 +337,7 @@ final class Dos
         }
 
         $this->addDebugMessage("do clean");
-        return $this->rmdir($this->config->getDataDirectory());
+        return $this->rmdir($this->config->getLogDirectory());
     }
 
     /**
@@ -269,7 +359,7 @@ final class Dos
                 continue;
             }
 
-            if (filemtime($filename) + $this->config->getBlockingPeriod() + 3600 * 24 > time()) {
+            if (filemtime($filename) + $this->config->getBlockingPeriod() + 3600 * 24 > $this->request_time) {
                 $hasFiles = true;
                 continue;
             } elseif (is_dir($filename)) {
@@ -319,7 +409,7 @@ final class Dos
 </head>
 <body>
 <h1 class="dos">Forbidden</h1>
-<p>You don't have permission to access {$this->uri} on this server.</p>
+<p>You don't have permission to access {$this->request_uri} on this server.</p>
 </body>
 </html>
 HTML;

@@ -24,6 +24,10 @@ $dos->run();
 ```PHP
 
 $config = new Sohophp\Security\DosConfig();
+//开启调试消息
+$config->setDebug(true);
+//开启详情记录
+$config->setSpread(true);
 //添加IP白名单
 $config->addWhiteList('::1','127.0.0.1');
 //单页每秒最大请求数
@@ -31,7 +35,7 @@ $config->setPageCount(3);
 //站点每秒请求数
 $config->setSiteCount(100);
 //加入黑名单秒数，每次请求重置拉黑时间
-$config->setBlockingPeriod(300);
+$config->setBlockingPeriod(30);
 //监听全部METHOD
 //$config->setListenMethods(["ANY"]);
 //监听以下METHOD
@@ -41,16 +45,18 @@ $dos = new Sohophp\Security\Dos($config);
 //$dos->run();
 //测试使用
 try{
-
     if($dos->refused()){ 
+        echo '<pre>';
         print_r($dos->getDebugMessages());
+        echo '</pre>';
         die("已被拉黑");
     }
 }catch (Exception $exception){
-    error_log($exception->getMessage());
+    die($exception->getMessage());
 }
 
 ```
+
 ### 测试方法
 
 连续刷新同一网址

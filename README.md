@@ -7,7 +7,9 @@
 ## 安装方法
 
 ```Bash
-npm install sohophp/security
+
+composer require sohophp/security
+
 ```
 
 

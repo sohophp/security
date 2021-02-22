@@ -102,6 +102,11 @@ final class Dos
             return false;
         }
 
+        if (!in_array('ANY', $this->config->getListenMethods())
+            && !in_array($this->request_method, $this->config->getListenMethods())) {
+            return false;
+        }
+
         /**
          * 如果在黑名单中，更新拉黑时间并返回真
          */
@@ -113,7 +118,7 @@ final class Dos
         $data_info = [
             "REQUEST_URI" => $this->request_uri,
             "NOW" => microtime(true),
-            "method" => $_SERVER['REQUEST_METHOD'],
+            "method" => $this->request_method,
             "REQUEST_TIME" => $this->request_time,
             //"USER_AGENT" => $_SERVER['HTTP_USER_AGENT']
         ];

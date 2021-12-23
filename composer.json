@@ -1,5 +1,5 @@
 {
-  "version": "v2.0.0",
+  "version": "v2.0.1",
   "name": "sohophp/security",
   "description": "A PHP class that avoids violent attacks 一个规避暴力攻击的PHP类",
   "type": "library",
@@ -17,6 +17,6 @@
     }
   },
   "require": {
-    "php": "^8.1.0"
+    "php": ">=8.1.0"
   }
 }

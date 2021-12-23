@@ -15,63 +15,63 @@ final class DosConfig implements ArrayAccess
      *
      * @var array
      */
-    private $white_list = [];
+    private array $white_list = [];
     /**
      * 單頁每page_interval秒最大請求數
      *
      * @var integer
      */
-    private $page_count = 2;
+    private int $page_count = 2;
     /**
      * 封鎖週期
      *
      * @var integer
      */
-    private $blocking_period = 10;
+    private int $blocking_period = 10;
 
     /**
      * 站點每秒最大請求數
      *
      * @var integer
      */
-    private $site_count = 50;
+    private int $site_count = 50;
 
     /**
      * 每頁時間間隔，單位秒
      *
      * @var integer
      */
-    private $page_interval = 1;
+    private int $page_interval = 1;
     /**
      * 站點時間間隔，單位秒
      *
      * @var integer
      */
-    private $site_interval = 1;
+    private int $site_interval = 1;
     /**
      * 收信地址
      *
      * @var array
      */
-    private $email_addresses = [];
+    private array $email_addresses = [];
     /**
      * 記錄文件存放路徑
      *
      * @var string
      */
-    private $data_directory;
+    private string $data_directory;
     /**
      * @var array|string[] 监听的请求方法
      */
-    private $listen_methods = ['ANY'];
+    private array $listen_methods = ['ANY'];
     /**
      * @var bool 是否记录请求详情
      */
-    private $spread = false;
+    private bool $spread = false;
     /**
      * @var bool 是否使用调试
      */
-    private $debug = false;
+    private bool $debug = false;
 
     public function __construct(array $options = [])
     {
@@ -84,22 +84,22 @@ final class DosConfig implements ArrayAccess
     }
 
 
-    public function offsetExists($offset)
+    public function offsetExists(mixed $offset):bool
     {
         return isset($this->{$offset});
     }
 
-    public function offsetGet($offset)
+    public function offsetGet(mixed $offset):mixed
     {
         return $this->{$offset};
     }
 
-    public function offsetSet($offset, $value)
+    public function offsetSet(mixed $offset, mixed $value):void
     {
         $this->{$offset} = $value;
     }
 
-    public function offsetUnset($offset)
+    public function offsetUnset(mixed $offset):void
     {
         unset($this->{$offset});
     }
@@ -120,7 +120,7 @@ final class DosConfig implements ArrayAccess
         $this->white_list = $white_list;
     }
 
-    public function addWhiteList(...$white_list)
+    public function addWhiteList(...$white_list):void
     {
         foreach ($white_list as $ip) {
             $this->white_list[] = $ip;
@@ -283,7 +283,10 @@ final class DosConfig implements ArrayAccess
         return $clone;
     }
 
-    public function getLogDirectory(): string
+    /**
+     * @return string
+     */
+     public function getLogDirectory(): string
     {
         return rtrim($this->getDataDirectory(), '/') . '/DoS_log';
     }
@@ -293,7 +296,7 @@ final class DosConfig implements ArrayAccess
      */
     public function setListenMethods(array $listen_methods)
     {
-        $this->listen_methods = array_map("strtoupper", $listen_methods);
+        $this->listen_methods = array_map("stopper", $listen_methods);
     }
 
     /**
@@ -387,7 +390,10 @@ final class DosConfig implements ArrayAccess
         ];
     }
 
-    public function __debugInfo()
+    /**
+     * @return array
+     */
+    public function __debugInfo():array
     {
         return $this->toArray();
     }

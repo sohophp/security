@@ -2,6 +2,7 @@
 
 namespace Sohophp\Security;
 
+use Closure;
 use ErrorException;
 
 /**
@@ -13,50 +14,51 @@ final class Dos
     /**
      * @var DosConfig
      */
-    private $config;
+    private DosConfig $config;
 
     /**
-     * @var string|null
+     * @var string
      */
-    private $ip;
+    private string $ip;
 
     /**
      * 加入黑名单时执行的函数
-     * @var callable
+     * @var mixed|callable
+     * \Closure|\callable
      */
-    private $blocking_callback;
+    private mixed $blocking_callback = null;
     /**
      * @var array 调试信息
      */
-    private $debug_messages = [];
+    private array $debug_messages = [];
     /**
      * @var string 请求网址
      */
-    private $request_uri;
+    private string $request_uri;
     /**
      * @var int 请求时间
      */
-    private $request_time;
+    private int $request_time;
     /**
      * @var string 请求方法
      */
-    private $request_method;
+    private string $request_method;
     /**
      * @var string 数据路径
      */
-    private $dir;
+    private string $dir;
 
     /**
      * Dos constructor.
      * @param DosConfig|null $config
      */
-    public function __construct(?DosConfig $config = null)
+    public function __construct(DosConfig $config = null)
     {
 
-        $this->ip = $_SERVER['REMOTE_ADDR'];
-        $this->request_uri = $_SERVER['REQUEST_URI'];
-        $this->request_time = $_SERVER['REQUEST_TIME'];
-        $this->request_method = $_SERVER['REQUEST_METHOD'];
+        $this->ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        $this->request_uri = $_SERVER['REQUEST_URI'] ?? '';
+        $this->request_time = $_SERVER['REQUEST_TIME'] ?? '';
+        $this->request_method = $_SERVER['REQUEST_METHOD'] ?? '';
         $this->config = $config ?? new DosConfig();
         $this->addDebugMessage("{$this->ip} [{$this->request_method}] {$this->request_uri}");
         $this->autoClean();
@@ -286,6 +288,7 @@ final class Dos
 
         file_put_contents($filename, json_encode($data));
         chmod($filename, 0777);
+
         if (is_callable($this->blocking_callback)) {
             $args = [];
             call_user_func($this->blocking_callback, $args);
@@ -367,7 +370,9 @@ final class Dos
             if (filemtime($filename) + $this->config->getBlockingPeriod() + 3600 * 24 > $this->request_time) {
                 $hasFiles = true;
                 continue;
-            } elseif (is_dir($filename)) {
+            }
+
+            if (is_dir($filename)) {
                 if (!$this->rmdir($filename)) {
                     $hasFiles = true;
                 }
